@@ -1,0 +1,11 @@
+{
+    "repos": [
+        {
+            "name": "repo_1_name",
+            "org": "repo_1_org",
+            "packages": {
+                "package_1_name": "language_of_package",
+            }
+        }
+    ]
+}
