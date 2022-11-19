@@ -7,7 +7,12 @@ import filters
 def per_package(repo):
     github = Github(login_or_token=os.environ.get("GH_TOKEN"))
 
-    package_filter = list(repo["packages"])
+    packages = repo["packages"]
+    if packages:
+        package_filter = list(repo["packages"])
+    else:
+        package_filter = None
+
     name = repo["name"]
     org = repo["org"]
     repo_url = "https://github.com/{0}/{1}".format(org, name)

@@ -95,7 +95,7 @@ def get_dependents(url, repositories, package_filter, minstar):
     packages = get_dependents_packages(sess, url, destination)
 
     for package in list(packages):
-        if not package["name"] in package_filter:
+        if package_filter and (not package["name"] in package_filter):
             packages.remove(package)
             continue
         page_url = package["url"]
