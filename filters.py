@@ -1,5 +1,8 @@
-def filter_forks(github, dependent, dependents):
-    repo = github.get_repo(dependent)
+def filter_forks(github_cache, dependent, dependents):
+    try:
+        repo = github_cache.get_repo(dependent)
+    except Exception: 
+        return False
     if repo.source:
         if (repo.source.full_name in dependents) or ("iotaledger" in repo.source.full_name):
             return False
