@@ -74,8 +74,7 @@ def get_dependents(url, repositories, package_filter, minstar):
     if not repositories:
         destination = "package"
         destinations = "packages"
-    
-    repos = []
+
     more_than_zero_count = 0
     total_repos_count = 0
     spinner = Halo(text="Fetching information about {0}".format(destinations), spinner="dots")
@@ -95,6 +94,7 @@ def get_dependents(url, repositories, package_filter, minstar):
     packages = get_dependents_packages(sess, url, destination)
 
     for package in list(packages):
+        repos = []
         if package_filter and (not package["name"] in package_filter):
             packages.remove(package)
             continue
