@@ -1,12 +1,7 @@
-from github import Github
-import os
-
 import ghtopdep
 import filters
 
-def per_package(repo):
-    github = Github(login_or_token=os.environ.get("GH_TOKEN"))
-
+def per_package(repo, cache):
     packages = repo["packages"]
     if packages:
         package_filter = list(repo["packages"])
@@ -37,7 +32,7 @@ def per_package(repo):
     # Clean up dependents
     print("Dependents which aren't forks of other dependents:")
     for package in dependents_per_package:
-        dependents = {name: info for (name, info) in package["dependents"].items() if filters.filter_forks(github, name, package["dependents"])}
+        dependents = {name: info for (name, info) in package["dependents"].items() if filters.filter_forks(cache, name, package["dependents"])}
         print(package["name"], ": ", len(dependents), "/", len(package["dependents"]))
 
         package["filtered_dependents"] = dependents
@@ -45,7 +40,7 @@ def per_package(repo):
     # Get commit activity of all dependencies
     for package in dependents_per_package:
         for name, info in package["filtered_dependents"].items():
-            repo = github.get_repo(name)
+            repo = cache.get_repo(name)
             info["commit_activity"] = repo.get_stats_commit_activity()
 
     # Filter active repos
