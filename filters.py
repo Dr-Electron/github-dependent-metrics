@@ -11,5 +11,7 @@ def filter_forks(github_cache, dependent, dependents):
         return True
 
 def filter_active_repos(dependent):
+    if dependent[1]["commit_activity"] == None:
+        return False
     commits_last_six_months = sum(stat.total for stat in dependent[1]["commit_activity"][26:])
     return commits_last_six_months > 0
