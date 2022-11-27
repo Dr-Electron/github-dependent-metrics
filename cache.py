@@ -24,20 +24,40 @@ class GithubAPI:
             if "commit_activity" in self.cache[full_name]:
                 self._cached_calls += 1
                 return self.cache[full_name]["commit_activity"]
-            else:
-                self._uncached_calls += 1
-                repo = self.get_repo(full_name)
-                commit_activity = repo.get_stats_commit_activity()
-                self.cache[full_name]["commit_activity"] = commit_activity
-                return commit_activity
-        
-        self._uncached_calls += 1
+
         repo = self.get_repo(full_name)
+        self._uncached_calls += 1
         commit_activity = repo.get_stats_commit_activity()
         self.cache[full_name] = {
+            **self.cache[full_name],
             "commit_activity": commit_activity
         }
         return commit_activity
+
+    def get_contents(self, full_name: str, path: str):
+        if full_name in self.cache:
+            if "contents" in self.cache[full_name]:
+                if path in self.cache[full_name]["contents"]:
+                    self._cached_calls += 1
+                    return self.cache[full_name]["contents"][path]
+                repo = self.get_repo(full_name)
+                self._uncached_calls += 1
+                contents = repo.get_contents(path)
+                self.cache[full_name]["contents"] = {
+                    **self.cache[full_name]["contents"],
+                    path: contents
+                }
+                return contents
+        
+        repo = self.get_repo(full_name)
+        self._uncached_calls += 1
+        contents = repo.get_contents(path)
+        self.cache[full_name] = {
+            **self.cache[full_name],
+            "contents": {path: contents}
+        }
+
+        return contents
 
     @property
     def uncached_calls(self):
