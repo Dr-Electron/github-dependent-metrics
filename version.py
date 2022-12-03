@@ -7,6 +7,23 @@ regex = r'(?:\?|\&)(?:\=|\&?)((rev=)+?(?P<revison>[\w|\d]+)|(branch=)+?(?P<branc
 def has_same_path(path1, path2):
     return os.path.split(path1)[0] == os.path.split(path2)[0]
 
+def get_matching_files(cache, full_name: str, pattern):
+    files = []
+    contents = list(cache.get_contents(full_name, ""))
+    while contents:
+        file_content = contents.pop(0)
+        if file_content.type == "dir":
+            contents.extend(list(cache.get_contents(full_name, file_content.path)))
+        else:
+            if pattern in file_content.path:
+                files.append(file_content)
+
+    def sort_content_files(file):
+        return file.path 
+    
+    files.sort(key=sort_content_files)
+    return files
+
 def get_rust_lib_version(cache, full_name: str, package_name):
     files = get_matching_files(cache, full_name, ['Cargo.toml', 'Cargo.lock'])
     versions = []
@@ -56,21 +73,3 @@ def get_rust_lib_version(cache, full_name: str, package_name):
         })
 
     return versions
-
-def get_matching_files(cache, full_name: str, patterns: list):
-    files = []
-    contents = list(cache.get_contents(full_name, ""))
-    while contents:
-        file_content = contents.pop(0)
-        if file_content.type == "dir":
-            contents.extend(list(cache.get_contents(full_name, file_content.path)))
-        else:
-            for pattern in patterns:
-                if pattern in file_content.path:
-                    files.append(file_content)
-
-    def sort_content_files(file):
-        return file.path 
-    
-    files.sort(key=sort_content_files)
-    return files
