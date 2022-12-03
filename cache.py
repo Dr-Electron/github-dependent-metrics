@@ -1,4 +1,5 @@
 from github import Github
+import os
 
 class GithubAPI:
     def __init__(self, login_or_token):
@@ -58,6 +59,15 @@ class GithubAPI:
         }
 
         return contents
+
+    def get_content(self, full_name: str, file: str):
+        (path, _) = os.path.split(file)
+        content_files = self.cache[full_name]['contents'][path]
+        for content_file in content_files:
+            if file in content_file.path:
+                return content_file
+        
+        return None
 
     @property
     def uncached_calls(self):
