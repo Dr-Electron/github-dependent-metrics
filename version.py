@@ -1,10 +1,6 @@
 import json
-import os
 import re
 import tomllib
-
-def has_same_path(path1, path2):
-    return os.path.split(path1)[0] == os.path.split(path2)[0]
 
 def get_matching_files(cache, full_name: str, pattern):
     files = []
@@ -32,8 +28,18 @@ def get_rust_lib_version(cache, full_name: str, package_name):
         current_index = index
         index += 1
 
-        file = files[current_index]
-        split_file = file.path.split('/')
+        manifest_file = files[current_index]
+
+        manifest_dependent = {}
+        manifest = tomllib.loads(manifest_file.decoded_content.decode())
+        if 'dependencies' in manifest and package_name in manifest['dependencies']:
+            dependency = manifest['dependencies'][package_name]
+            if isinstance(dependency, str):
+                manifest_dependent['version'] = dependency
+            else:
+                manifest_dependent = manifest['dependencies'][package_name]
+
+        split_file = manifest_file.path.split('/')
 
         split_file[-1] = 'Cargo.lock'
         lock_file_path = '/'.join(split_file) 
@@ -58,31 +64,13 @@ def get_rust_lib_version(cache, full_name: str, package_name):
                     ).groupdict() if (lock_dependent) else {}
                     lock_dependent['rev'] = match_dict['rev'] if match_dict.get('rev') else match_dict.get('commit')
                     lock_dependent['branch'] = match_dict['branch']
+        else:
+            lock_dependent = root_lock_dependent
 
         if len(split_file) == 1:
             root_lock_dependent = lock_dependent
 
-        manifest_dependent = {}
-        manifest_file = None
-        if files[current_index].path.endswith(".toml"):
-            manifest_file = files[current_index]
-            if not lock_file:
-                lock_dependent = root_lock_dependent
-
-        if current_index+1 < len(files) and has_same_path(files[current_index].path, files[current_index+1].path):
-            index += 1
-            manifest_file = files[current_index+1]
-        
-        if manifest_file:
-            manifest = tomllib.loads(manifest_file.decoded_content.decode())
-            if 'dependencies' in manifest and package_name in manifest['dependencies']:
-                dependency = manifest['dependencies'][package_name]
-                if isinstance(dependency, str):
-                    manifest_dependent['version'] = dependency
-                else:
-                    manifest_dependent = manifest['dependencies'][package_name]
-
-        if not manifest_dependent and not lock_dependent:
+        if not bool(manifest_dependent) and not bool(lock_dependent):
             continue
 
         versions.append({
@@ -105,12 +93,36 @@ def get_js_lib_version(cache, full_name: str, package_name):
         current_index = index
         index += 1
 
-        file = files[current_index]
-        split_file = file.path.split('/')
+        manifest_file = files[current_index]
+
+        manifest_dependent = {}
+        manifest = json.loads(manifest_file.decoded_content.decode())
+        manifest_version = None
+        manifest_branch = None
+        if 'dependencies' in manifest and package_name in manifest['dependencies']:
+            manifest_version = manifest['dependencies'][package_name]
+        if 'devDependencies' in manifest and package_name in manifest['devDependencies']:
+            manifest_version = manifest['devDependencies'][package_name]
+        
+        if manifest_version:
+            if '/' in manifest_version:
+                manifest_branch = re.search(r'(?:#)((?:.(?!#))+$)', manifest_version).group(1)
+                manifest_version = None
+            
+            manifest_dependent = {
+                'version': manifest_version,
+                'branch': manifest_branch
+            }   
+
+        split_file = manifest_file.path.split('/')
 
         split_file[-1] = 'package-lock.json'
         lock_file_path = '/'.join(split_file) 
         npm_lock_file = cache.get_content(full_name, lock_file_path)
+
+        split_file[-1] = 'yarn.lock'
+        lock_file_path = '/'.join(split_file) 
+        yarn_lock_file = cache.get_content(full_name, lock_file_path)
 
         lock_dependent = {}
         if npm_lock_file:
@@ -125,48 +137,16 @@ def get_js_lib_version(cache, full_name: str, package_name):
                     lock_dependent['branch'] = re.search(regex, dependent.get('from')).group()
                 else:
                     lock_dependent['version'] = dependent.get('version')
-
-        split_file[-1] = 'yarn.lock'
-        lock_file_path = '/'.join(split_file) 
-        yarn_lock_file = cache.get_content(full_name, lock_file_path)
-        if yarn_lock_file:
+        elif yarn_lock_file:
             dependent = parse_yarn(yarn_lock_file.decoded_content.decode(), package_name)
 
             lock_dependent['rev'] = re.search(r'(?:#commit=)([a-z,0-9]+)', dependent['resolution']).group(1)
             lock_dependent['version'] = dependent['version']
-            
+        else:
+            lock_dependent = root_lock_dependent
+
         if len(split_file) == 1:
-            root_lock_dependent = lock_dependent
-
-        manifest_dependent = {}
-        manifest_file = None
-        if files[current_index].path.endswith("package.json"):
-            manifest_file = files[current_index]
-            if not npm_lock_file and not yarn_lock_file:
-                lock_dependent = root_lock_dependent
-
-        if current_index+1 < len(files) and has_same_path(files[current_index].path, files[current_index+1].path):
-            index += 1
-            manifest_file = files[current_index+1]
-        
-        if manifest_file:
-            manifest = json.loads(manifest_file.decoded_content.decode())
-            manifest_version = None
-            manifest_branch = None
-            if 'dependencies' in manifest and package_name in manifest['dependencies']:
-                manifest_version = manifest['dependencies'][package_name]
-            if 'devDependencies' in manifest and package_name in manifest['devDependencies']:
-                manifest_version = manifest['devDependencies'][package_name]
-            
-            if manifest_version:
-                if '/' in manifest_version:
-                    manifest_branch = re.search(r'(?:#)((?:.(?!#))+$)', manifest_version).group(1)
-                    manifest_version = None
-                
-                manifest_dependent = {
-                    'version': manifest_version,
-                    'branch': manifest_branch
-                }    
+            root_lock_dependent = lock_dependent 
 
         if not bool(manifest_dependent) and not bool(lock_dependent):
             continue
