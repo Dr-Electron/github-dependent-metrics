@@ -76,7 +76,11 @@ def get_rust_lib_version(cache, full_name: str, package_name):
         if manifest_file:
             manifest = tomllib.loads(manifest_file.decoded_content.decode())
             if 'dependencies' in manifest and package_name in manifest['dependencies']:
-                manifest_dependent = manifest['dependencies'][package_name]
+                dependency = manifest['dependencies'][package_name]
+                if isinstance(dependency, str):
+                    manifest_dependent['version'] = dependency
+                else:
+                    manifest_dependent = manifest['dependencies'][package_name]
 
         if not manifest_dependent and not lock_dependent:
             continue
