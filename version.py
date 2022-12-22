@@ -8,6 +8,7 @@ def get_matching_files(cache, full_name: str, pattern):
     while contents:
         file_content = contents.pop(0)
         if file_content.type == "dir":
+            if not 'node_modules' in file_content.path:
             contents.extend(list(cache.get_contents(full_name, file_content.path)))
         else:
             if pattern in file_content.path:
