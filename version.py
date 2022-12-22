@@ -167,15 +167,15 @@ def parse_yarn(content, package_name):
 
     lines = re.finditer(r'.*\n', content)
     for line in lines:
-        line = line.group(0)
-        if line.startswith('"' + package_name):
+        line_str = line.group(0)
+        if line_str.startswith('"' + package_name):
             for line in lines:
-                if not re.match(r'\s', line.group(0)): break
+                line_str = line.group(0)
+                if not re.match(r'\s', line_str): break
                 else:
-                    line = line.group(0)
-                    if 'version: ' in line:
-                        dependent['version'] = line.split('version: ')[1].strip()
-                    if 'resolution: ' in line:
-                        dependent['resolution'] = line.split('resolution: ')[1].strip()
+                    if 'version: ' in line_str:
+                        dependent['version'] = line_str.split('version: ')[1].strip()
+                    if 'resolution: ' in line_str:
+                        dependent['resolution'] = line_str.split('resolution: ')[1].strip()
 
     return dependent
