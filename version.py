@@ -23,7 +23,7 @@ def get_matching_files(cache, full_name: str, pattern):
 def get_rust_lib_version(cache, full_name: str, package_name):
     files = get_matching_files(cache, full_name, 'Cargo.toml')
     versions = []
-    root_lock_dependent = None
+    root_lock_dependent = {}
     index = 0
     while index < len(files):
         current_index = index
@@ -33,7 +33,7 @@ def get_rust_lib_version(cache, full_name: str, package_name):
 
         manifest_dependent = {}
         manifest = tomllib.loads(manifest_file.decoded_content.decode())
-        if 'dependencies' in manifest and package_name in manifest['dependencies']:
+        if 'dependencies' in manifest and package_name in manifest['dependencies']: #TODO Do we want to check dev-dependencies too?
             dependency = manifest['dependencies'][package_name]
             if isinstance(dependency, str):
                 manifest_dependent['version'] = dependency
@@ -51,8 +51,28 @@ def get_rust_lib_version(cache, full_name: str, package_name):
             lock_file_dict = tomllib.loads(
                 lock_file.decoded_content.decode()
             )
+            lock_file_dependents = list(filter(lambda package: package.get("name") == package_name, lock_file_dict.get('package')))
+            lock_file_dependent = {}
+
+            if len(lock_file_dependents) == 1:
+                lock_file_dependent = lock_file_dependents[0]
+            elif len(lock_file_dependents) > 1:
+                package_dependent = next(
+                    (package for package in lock_file_dict.get('package') if package.get("name") == manifest['package']['name']), 
+                    {}
+                )
+
+                package_dependency = next(
+                    (dependency for dependency in package_dependent['dependencies'] if dependency.startswith(package_name)), 
+                    None
+                )
+
+                if not package_dependency:
+                    lock_file_dependent = {}
+                else:
+                    package_version = package_dependency.split()[1]
             lock_file_dependent = next(
-                (package for package in lock_file_dict.get('package') if package.get("name") == package_name), 
+                        (dependent for dependent in lock_file_dependents if dependent.get("version") == package_version), 
                 {}
             )
 
@@ -65,7 +85,7 @@ def get_rust_lib_version(cache, full_name: str, package_name):
                     ).groupdict() if (lock_dependent) else {}
                     lock_dependent['rev'] = match_dict['rev'] if match_dict.get('rev') else match_dict.get('commit')
                     lock_dependent['branch'] = match_dict['branch']
-        else:
+        elif bool(manifest_dependent):
             lock_dependent = root_lock_dependent
 
         if len(split_file) == 1:
