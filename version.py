@@ -9,7 +9,7 @@ def get_matching_files(cache, full_name: str, pattern):
         file_content = contents.pop(0)
         if file_content.type == "dir":
             if not 'node_modules' in file_content.path:
-            contents.extend(list(cache.get_contents(full_name, file_content.path)))
+                contents.extend(list(cache.get_contents(full_name, file_content.path)))
         else:
             if pattern in file_content.path:
                 files.append(file_content)
@@ -71,10 +71,10 @@ def get_rust_lib_version(cache, full_name: str, package_name):
                     lock_file_dependent = {}
                 else:
                     package_version = package_dependency.split()[1]
-            lock_file_dependent = next(
+                    lock_file_dependent = next(
                         (dependent for dependent in lock_file_dependents if dependent.get("version") == package_version), 
-                {}
-            )
+                        {}
+                    )
 
             if bool(lock_file_dependent):
                 lock_dependent['version'] = lock_file_dependent.get('version')
@@ -108,7 +108,7 @@ def get_rust_lib_version(cache, full_name: str, package_name):
 def get_js_lib_version(cache, full_name: str, package_name):
     files = get_matching_files(cache, full_name, 'package.json')
     versions = []
-    root_lock_dependent = None
+    root_lock_dependent = {}
     index = 0
     while index < len(files):
         current_index = index
@@ -146,23 +146,27 @@ def get_js_lib_version(cache, full_name: str, package_name):
         yarn_lock_file = cache.get_content(full_name, lock_file_path)
 
         lock_dependent = {}
-        if npm_lock_file:
+        # Temporary workaround for https://github.com/PyGithub/PyGithub/issues/2345
+        if bool(npm_lock_file) and npm_lock_file.encoding != 'none':
             lock_file_dict = json.loads(
                 npm_lock_file.decoded_content.decode()
             )
-            dependent = lock_file_dict['dependencies'].get(package_name)
-            if dependent:
-                if dependent.get('version').startswith('git'):
-                    regex = '(?:.(?!#).)+$'
-                    lock_dependent['rev'] = re.search(regex, dependent.get('version')).group()
-                    lock_dependent['branch'] = re.search(regex, dependent.get('from')).group()
-                else:
-                    lock_dependent['version'] = dependent.get('version')
+            if 'dependencies' in lock_file_dict:
+                dependent = lock_file_dict['dependencies'].get(package_name)
+                if dependent:
+                    if dependent.get('version').startswith('git'):
+                        regex = '(?:.(?!#).)+$'
+                        lock_dependent['rev'] = re.search(regex, dependent.get('version')).group()
+                        lock_dependent['branch'] = re.search(regex, dependent.get('from')).group()
+                    else:
+                        lock_dependent['version'] = dependent.get('version')
         elif yarn_lock_file:
             dependent = parse_yarn(yarn_lock_file.decoded_content.decode(), package_name)
 
-            lock_dependent['rev'] = re.search(r'(?:#commit=)([a-z,0-9]+)', dependent['resolution']).group(1)
-            lock_dependent['version'] = dependent['version']
+            if bool(dependent):
+                if '.git#' in dependent.get('resolution'):
+                    lock_dependent['rev'] = re.search(r'(?:#commit=)([a-z,0-9]+)', dependent['resolution']).group(1)
+                lock_dependent['version'] = dependent['version']
         else:
             lock_dependent = root_lock_dependent
 
